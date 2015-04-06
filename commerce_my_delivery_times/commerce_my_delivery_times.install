@@ -1,0 +1,159 @@
+<?php
+
+
+/**
+ * @file
+ * Provides install & schema data for the click and collect module.
+ */
+/**
+ * Implements hook_uninstall().
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function commerce_my_delivery_times_schema() {
+
+  $schema['delivery_holiday_list'] = array(
+      'description' => 'A table for holding list of holidays for Delivery time slots.',
+      'fields' => array(
+          'hid' => array(
+              'description' => 'The holiday id.',
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+          ),
+          'holiday_date' => array(
+              'description' => 'The Holiday Date.',
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+          'holiday_reason' => array(
+              'description' => 'The holiday reason.',
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+      ),
+      'primary key' => array('hid'),
+  );
+
+
+  $schema['delivery_time_slots_master'] = array(
+      'description' => 'A table for storing store master configuration data.',
+      'fields' => array(
+          'dtsm_id' => array(
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+          ),
+          'delivery_slot_date' => array(
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+          'no_of_delivery_slot' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'delivery_slot_master_individual' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+      ),
+      'primary key' => array('dtsm_id'),
+  );
+
+
+
+  $schema['delivery_time_slots'] = array(
+      'description' => 'A table for storing store time slot at store level.',
+      'fields' => array(
+          'dts_id' => array(
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+          ),
+          'dtsm_id' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'slot_start_time' => array(
+              'type' => 'numeric',
+              'size' => 'normal',
+              'precision' => 10,
+              'scale' => 2,
+              'not null' => TRUE,
+          ),
+          'slot_end_time' => array(
+              'type' => 'numeric',
+              'size' => 'normal',
+              'precision' => 10,
+              'scale' => 2,
+              'not null' => TRUE,
+          ),
+          'slot_bucket_size' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'slot_threshold_time_accepting_order' => array(
+              'type' => 'numeric',
+              'size' => 'normal',
+              'precision' => 10,
+              'scale' => 2,
+              'not null' => TRUE,
+          ),
+      ),
+      'primary key' => array('dts_id'),
+  );
+  
+  $schema['delivery_slot_soft_and_hard_commit'] = array(
+      'description' => 'A table for storing collection point soft and hard commit data.',
+      'fields' => array(
+          'slot_id' => array(
+              'type' => 'serial',
+              'unsigned' => TRUE,
+              'not null' => TRUE,
+          ),
+          'delivery_time_slot_date' => array(
+              'type' => 'varchar',
+              'length' => 255,
+              'not null' => TRUE,
+          ),
+          'slot_start_time' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'slot_end_time' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'slot_bucket_size' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'soft_commit_count' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+          'hard_commit_count' => array(
+              'type' => 'int',
+              'length' => 10,
+              'not null' => TRUE,
+          ),
+      ),
+      'primary key' => array('slot_id'),
+  );
+  
+
+return $schema;
+}

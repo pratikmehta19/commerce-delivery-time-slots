@@ -1,0 +1,9 @@
+name = Commerce My Delivery Times
+description = Commerce My Delivery Times can schedule a order delivery on checkout. 
+package = My Delivery Times
+core = 7.x
+dependencies[] = commerce
+dependencies[] = date
+dependencies[] = system
+dependencies[] = entity
+dependencies[] = rules

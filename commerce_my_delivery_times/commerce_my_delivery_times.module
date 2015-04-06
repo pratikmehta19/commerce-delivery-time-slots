@@ -1,0 +1,200 @@
+<?php
+
+/*
+ * hook_menu and give page callabck with url.
+ */
+
+function commerce_my_delivery_times_menu() {
+  $items = array();
+
+  $items['admin/commerce/delivery-times/slot-configure'] = array(
+      'title' => 'Commerce My Delivery Times Slot Configuration',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('delivery_times_config_form'),
+      'access arguments' => array('access commerce my delivery times'),
+      'file' => 'includes/slot_configuration.inc',
+      'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/commerce/delivery-times/update-configuration'] = array(
+      'title' => 'Commerce My Delivery Times Configuration Update',
+      'page callback' => 'delivery_times_configuration_update',
+      'access arguments' => array('access commerce my delivery times'),
+      'file' => 'includes/slot_configuration.inc',
+      'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/commerce/delivery-times/edit-slot'] = array(
+      'title' => 'Edit Delivery Times Slot',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('edit_delivery_times_config_form'),
+      'access arguments' => array('access commerce my delivery times'),
+      'file' => 'includes/edit_delete_slot_configuration.inc',
+      'type' => MENU_CALLBACK,
+  );
+
+  $items['admin/commerce/delivery-times/delete-slot'] = array(
+      'title' => 'Delete Delivery Time Slot',
+      'page callback' => 'delete_delivery_time_slots',
+      'access arguments' => array('access commerce my delivery times'),
+      'file' => 'includes/edit_delete_slot_configuration.inc',
+      'type' => MENU_CALLBACK,
+  );
+  
+  $items['admin/commerce/delivery-times/settings'] = array(
+  		'title' => 'Delivery Time Slot Settings',
+  		'page callback' => 'drupal_get_form',
+  		'page arguments' => array('commerce_my_delivery_times_settings_form'),
+  		'access arguments' => array('access commerce my delivery times'),
+  );
+  
+  
+  $items['set-delivery-time-slot'] = array(
+      'title' => 'set delivery time slot session',
+      'page callback' => 'set_delivery_time_slot',
+      'access callback' => TRUE,
+      'type' => MENU_CALLBACK,
+  );
+
+
+  return $items;
+}
+
+function commerce_my_delivery_times_permission() {
+  return array(
+      'access commerce my delivery times' => array(
+          'title' => t('Commerce My Delivery Times'),
+          'description' => t('Access to create update and delete delivery time configurations'),
+      ),
+  );
+}
+
+/*
+ * Implements hook_commerce_checkout_pane_info()
+ */
+function commerce_my_delivery_times_commerce_checkout_pane_info() {
+  $panes['commerce_delivery_times'] = array(
+      'title' => t('Choose Delivery Time Slot'),
+      'page' => 'checkout',
+      'weight' => 10,
+      'file' => 'includes/my_delivery_times.checkout_pane.inc',
+      'base' => 'my_delivery_times',
+  );
+
+  drupal_add_js(drupal_get_path('module', 'commerce_my_delivery_times') . '/js/my_delivery_times.js');
+  return $panes;
+}
+
+/*
+ * Form that will have to set for forward days in checkout page
+*/
+
+function commerce_my_delivery_times_settings_form($form, &$form_state) {
+
+	$form['no_of_forward_days'] = array(
+			'#title' => "No of forwards days in Checkout Pane:",
+			'#description' => "Enter no of days which will appear on checkout pane",
+			'#type' => 'textfield',
+			'#required' => TRUE,
+			'#default_value' => variable_get('no_of_forward_days', '5'),
+	);
+	
+	$form['max_slot_per_day'] = array(
+			'#title' => "Maximum number of slot per day:",
+			'#description' => "Enter number of slots per day",
+			'#type' => 'textfield',
+			'#required' => TRUE,
+			'#default_value' => variable_get('max_slot_per_day', '4'),
+	);
+	
+	return system_settings_form($form);
+}
+
+
+/*
+ *  Ajax callback for Collection time slot 
+ */
+
+function set_delivery_time_slot() {
+
+  if (!empty($_REQUEST['delivery_time_slot_id'])) {
+    $checkout_collection_time_slot = $_REQUEST['delivery_time_slot_id'];
+    $checkout_collection_time_slot_data = explode('_', $checkout_collection_time_slot);
+    $dts_id = $checkout_collection_time_slot_data[0];
+    $delivery_slot_date = $checkout_collection_time_slot_data[1];
+    $slot_start_time = $checkout_collection_time_slot_data[2];
+    $slot_end_time = $checkout_collection_time_slot_data[3];
+    $slot_bucket_size = $checkout_collection_time_slot_data[4];
+    
+    watchdog('cp_value', $checkout_collection_time_slot);
+    watchdog('date_value',$delivery_slot_date);
+    
+    $soft_commit_db_check = db_select('delivery_slot_soft_and_hard_commit','sc')
+            ->fields('sc')
+            ->condition('sc.delivery_time_slot_date', $delivery_slot_date)
+            ->condition('sc.slot_start_time', $slot_start_time)
+            ->execute()
+            ->fetchAssoc();
+    if(empty($soft_commit_db_check)) {
+      
+      $slot_id = db_insert('delivery_slot_soft_and_hard_commit')
+              ->fields(array(
+                  'delivery_time_slot_date' => $delivery_slot_date,
+                  'slot_start_time' => $slot_start_time,
+                  'slot_end_time' => $slot_end_time,
+                  'slot_bucket_size' => $slot_bucket_size,
+                  'soft_commit_count' => 1,
+                  'hard_commit_count' => 0,
+              ))
+              ->execute();
+      $remaining_bucket = $slot_bucket_size -1;
+      $existing_slot = 0;
+      
+    } else {
+      
+      $slot_id = $soft_commit_db_check['slot_id'];
+      $soft_commit_count =  $soft_commit_db_check['soft_commit_count']; 
+      $bucket_size = $soft_commit_db_check['slot_bucket_size']; 
+      $soft_commit_count++;
+       //updating remaining bucket soft commit count
+          db_update('delivery_slot_soft_and_hard_commit')
+          ->fields(array(
+              'soft_commit_count' => $soft_commit_count, 
+          ))
+          ->condition('slot_id', $slot_id)
+          ->execute();
+          $remaining_bucket = $bucket_size-$soft_commit_count;
+          $existing_slot = 1;
+    }
+      if(isset($_SESSION['ds_time_slot_id'])) {
+          $previous_slot_id = $_SESSION['ds_time_slot_id'];
+        
+           $prev_slot_data = db_select('delivery_slot_soft_and_hard_commit', 'ds')
+                        ->fields('ds', array('slot_bucket_size','soft_commit_count'))
+                        ->condition('ds.slot_id', $previous_slot_id)
+                        ->execute()->fetchAssoc();
+           
+           $prev_slot_data['soft_commit_count']--;
+        //updating remaining bucket soft commit count
+          db_update('delivery_slot_soft_and_hard_commit')
+          ->fields(array(
+              'soft_commit_count' => $prev_slot_data['soft_commit_count'], 
+          ))
+          ->condition('slot_id', $previous_slot_id)
+          ->execute();
+          $previous_remaining_slot = $prev_slot_data['slot_bucket_size'] - $prev_slot_data['soft_commit_count'];
+          
+      } else {
+          $previous_slot_id = 0; // if its for first time
+          $previous_remaining_slot = 0;
+      }
+      $_SESSION["ds_time_slot_id"] = $slot_id;
+      $delivery_date = date('D, j M', strtotime($delivery_slot_date));
+      
+      
+      return drupal_json_output($dts_id.'|'.$delivery_slot_date.'|'.$remaining_bucket.'|'.$slot_id.'|'.$previous_slot_id.'|'.$previous_remaining_slot.'|'.$existing_slot);
+      
+    }    
+}
+
+?>
